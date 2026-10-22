@@ -1,0 +1,95 @@
+version: '3.8'
+
+services:
+  # ==========================================
+  # PostgreSQL Veritabanı Servisi
+  # ==========================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: cryptoai-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: cryptoai_user
+      POSTGRES_PASSWORD: cryptoai_password
+      POSTGRES_DB: cryptoai_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cryptoai_user -d cryptoai_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    networks:
+      - cryptoai-network
+
+  # ==========================================
+  # FastAPI Python Backend Servisi
+  # ==========================================
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: cryptoai-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+      - "8080:8000"
+    environment:
+      DATABASE_URL: postgresql+psycopg://cryptoai_user:cryptoai_password@postgres:5432/cryptoai_db
+      SECRET_KEY: cryptoai_super_secret_jwt_key_2026_secure
+      ENVIRONMENT: production
+      PORT: 8000
+      SMTP_HOST: smtp.gmail.com
+      SMTP_PORT: 587
+      SMTP_USER: ahmetdurmus2005@gmail.com
+      SMTP_PASSWORD: saevbplmrygfybaw
+      SMTP_FROM_NAME: CryptoAI Güvenlik
+    env_file:
+      - ./backend/.env
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - cryptoai-network
+
+  # ==========================================
+  # React Native / Web Frontend Servisi
+  # ==========================================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: cryptoai-frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "3000:80"
+    environment:
+      NODE_ENV: production
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    networks:
+      - cryptoai-network
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  cryptoai-network:
+    driver: bridge
