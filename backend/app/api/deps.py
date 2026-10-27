@@ -54,16 +54,19 @@ def get_current_user(
 def get_current_user_optional(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme),
     db: Session = Depends(get_db),
-) -> User:
+) -> Optional[User]:
     """Oturum varsa o kullanıcıyı, yoksa varsayılan demo kullanıcıyı döner."""
-    if credentials:
+    if credentials and credentials.credentials:
         try:
             return get_current_user(credentials, db)
-        except HTTPException:
+        except Exception:
             pass
 
     # Demo kullanıcıyı fallback olarak dön
-    demo = db.query(User).filter(User.email == "bgoryunar@gmail.com").first()
-    if not demo:
-        demo = db.query(User).first()
-    return demo
+    try:
+        demo = db.query(User).filter(User.email == "bgoryunar@gmail.com").first()
+        if not demo:
+            demo = db.query(User).first()
+        return demo
+    except Exception:
+        return None

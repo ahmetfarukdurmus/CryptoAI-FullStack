@@ -52,6 +52,9 @@ services:
       SMTP_FROM_NAME: CryptoAI Güvenlik
     env_file:
       - ./backend/.env
+    volumes:
+      - ./backend/app:/app/app
+      - ./backend/.env:/app/.env
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 10s

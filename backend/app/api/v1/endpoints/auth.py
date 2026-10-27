@@ -43,7 +43,7 @@ def register(
     if existing_user and existing_user.is_email_verified:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Bu e-posta adresiyle kayıtlı aktif bir hesap zaten mevcut.",
+            detail="Bu e-posta adresiyle zaten bir hesap mevcut, lütfen giriş yapın.",
         )
 
     # Henüz doğrulanmamış mevcut bir kayıt varsa şifresini ve bilgilerini güncelle
@@ -130,17 +130,22 @@ def register(
     )
     db.add(verif_record)
     db.commit()
+    db.refresh(new_user)
 
-    # E-postayı SMTP üzerinden gönder
+    # E-postayı Gmail SMTP üzerinden gönder
     send_verification_email(clean_email, otp_code)
 
     return RegisterResponseDto(
         message="6 haneli doğrulama kodu e-posta adresinize gönderildi.",
         email=clean_email,
+        status="verification_required",
         requires_verification=True,
+        token=None,
+        user=None,
     )
 
 
+@router.post("/verify-email", response_model=AuthResponseDto)
 @router.post("/verify-code", response_model=AuthResponseDto)
 def verify_code(
     req: VerifyCodeRequest,
@@ -194,6 +199,7 @@ def verify_code(
     )
 
 
+@router.post("/resend-verification")
 @router.post("/resend-code")
 def resend_verification_code(
     req: ResendCodeRequest,
@@ -249,7 +255,7 @@ def login(
             detail="E-posta veya şifre hatalı. Lütfen kontrol edin.",
         )
 
-    # Eğer e-posta henüz doğrulanmamışsa kod gönder ve uyar
+    # Eğer e-posta henüz doğrulanmamışsa yeni kod gönder ve uyar
     if not user.is_email_verified:
         otp_code = f"{random.randint(100000, 999999)}"
         verif = VerificationCode(

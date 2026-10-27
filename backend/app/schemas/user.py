@@ -61,4 +61,7 @@ class ResendCodeRequest(CamelModel):
 class RegisterResponseDto(CamelModel):
     message: str
     email: str
+    status: Optional[str] = "verification_required"
     requires_verification: bool = True
+    token: Optional[str] = None
+    user: Optional[UserDto] = None

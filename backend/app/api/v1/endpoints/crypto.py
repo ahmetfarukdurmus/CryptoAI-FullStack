@@ -1,7 +1,6 @@
 from typing import List
-from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
-from app.core.database import get_db
+from fastapi import APIRouter
+from app.core.database import SessionLocal
 from app.models.coin import CoinMarket
 from app.services.binance import fetch_binance_market_data
 from app.schemas.coin import CryptoMarketDto
@@ -10,16 +9,22 @@ router = APIRouter()
 
 
 @router.get("/market", response_model=List[CryptoMarketDto])
-async def get_crypto_market(db: Session = Depends(get_db)):
+async def get_crypto_market():
     """
     Binance Public REST API üzerinden majör paritelerin (BTC, ETH, SOL, BNB, ADA, AVAX)
     anlık 24 saatlik verilerini (lastPrice, priceChangePercent, highPrice, lowPrice, volume)
     sadeleştirilmiş ve canlı olarak döner.
+    Veritabanı oturumunu asenkron I/O süresince meşgul etmez.
     """
     live_tickers = await fetch_binance_market_data()
 
-    # Veritabanındaki takip listesi (watchlist) ve alarm durumlarını birleştir
-    db_coins = {c.symbol: c for c in db.query(CoinMarket).all()}
+    # Veritabanındaki takip listesi (watchlist) ve alarm durumlarını kısa ömürlü oturum ile al
+    db_coins = {}
+    try:
+        with SessionLocal() as db:
+            db_coins = {c.symbol: c for c in db.query(CoinMarket).all()}
+    except Exception:
+        pass
 
     results: List[CryptoMarketDto] = []
     for ticker in live_tickers:

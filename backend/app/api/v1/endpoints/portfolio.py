@@ -30,10 +30,31 @@ def get_portfolio(
 
     portfolio = db.query(Portfolio).filter(Portfolio.user_id == current_user.id).first()
     if not portfolio:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Portföy kaydı mevcut değil.",
+        # Portföy yoksa otomatik olarak $10.000 sanal başlangıç bakiyesi ile oluştur
+        portfolio = Portfolio(
+            user_id=current_user.id,
+            total_balance_usd=10000.0,
+            daily_change_usd=0.0,
+            is_autopilot_active=False,
+            llm_analysis_text="CryptoAI'a hoş geldiniz! Sanal bakiyenizle alım-satım yapmaya başlayabilirsiniz.",
         )
+        db.add(portfolio)
+        db.flush()
+        cash = Holding(
+            portfolio_id=portfolio.id,
+            symbol="USDT",
+            name="Kullanılabilir Nakit",
+            amount=10000.0,
+            value_usd=10000.0,
+            change_usd=0.0,
+            change_percent=0.0,
+            icon_letter="₮",
+            color="#26A17B",
+            is_cash=True,
+        )
+        db.add(cash)
+        db.commit()
+        db.refresh(portfolio)
 
     holdings_dtos = [HoldingDto.model_validate(h) for h in portfolio.holdings]
 
@@ -166,3 +187,56 @@ def execute_trade(
     db.commit()
 
     return {"success": True, "message": f"{req.symbol} {req.type} işlemi başarıyla tamamlandı."}
+
+
+@router.get("/transactions")
+def get_transactions(
+    current_user: User = Depends(get_current_user_optional),
+    db: Session = Depends(get_db),
+):
+    """
+    Kullanıcının veritabanındaki son alım-satım işlem geçmişini döner.
+    React Native PortfolioScreen ile tam uyumlu TransactionDto formatında listeler.
+    """
+    if not current_user:
+        return []
+
+    logs = (
+        db.query(AutopilotLog)
+        .filter(AutopilotLog.user_id == current_user.id)
+        .order_by(AutopilotLog.created_at.desc())
+        .limit(50)
+        .all()
+    )
+
+    result = []
+    for l in logs:
+        amount = 1.0
+        cost_usd = 0.0
+        if l.amount_info:
+            parts = l.amount_info.split()
+            if parts and parts[0].replace('.', '', 1).isdigit():
+                try:
+                    amount = float(parts[0])
+                except Exception:
+                    amount = 1.0
+            if '$' in l.amount_info:
+                try:
+                    cost_usd = float(l.amount_info.split('$')[1].rstrip(')'))
+                except Exception:
+                    cost_usd = 0.0
+
+        price = (cost_usd / amount) if amount > 0 else 0.0
+        created_at_str = l.created_at.isoformat() if l.created_at else datetime.now().isoformat()
+
+        result.append({
+            "id": l.id,
+            "symbol": l.symbol or "BTC",
+            "type": l.type or "BUY",
+            "amount": amount,
+            "price": price,
+            "costUsd": cost_usd,
+            "createdAt": created_at_str,
+        })
+
+    return result

@@ -9,9 +9,14 @@ from app.api.v1.endpoints import (
     alerts,
     notifications,
     backtest,
+    ai,
 )
 
 api_router = APIRouter()
+
+# Yapay Zeka Danışmanı & Chat (/ai/chat, /chat/message)
+api_router.include_router(ai.router, prefix="/ai", tags=["AI Consultant"])
+api_router.include_router(ai.router, prefix="/chat", tags=["AI Chat"])
 
 # Kimlik Doğrulama & Kullanıcı (/auth/register, /auth/login, /auth/me, /auth/profile)
 api_router.include_router(auth.router, prefix="/auth", tags=["Authentication"])

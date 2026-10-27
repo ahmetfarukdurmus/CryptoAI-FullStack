@@ -53,7 +53,7 @@ def get_user_alerts(
 ):
     """Kullanıcının aktif alarmlarını listeler."""
     if not current_user:
-        raise HTTPException(status_code=401, detail="Oturum gereklidir.")
+        return []
 
     alerts = (
         db.query(Alert)
