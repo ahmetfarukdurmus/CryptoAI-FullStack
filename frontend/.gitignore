@@ -1,0 +1,28 @@
+# Node modules & builds
+node_modules/
+dist/
+build/
+.cache/
+
+# React Native
+.metro/
+android/app/build/
+ios/build/
+*.mode1v3
+*.mode2v3
+*.moved-aside
+*.pbxuser
+*.perspectivev3
+
+# Environment
+.env
+.env.local
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# System
+.DS_Store
+Thumbs.db
